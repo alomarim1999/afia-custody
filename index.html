@@ -1,0 +1,996 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1d6a56">
+<title>عهدة المشتريات</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Noto+Kufi+Arabic:wght@600;700&display=swap">
+<style>
+/* Layout: one ledger column — month bar, the month's five figures, then a tabbed workbench (invoices, custody received, month close). */
+:root {
+  --paper: #eef2f0;
+  --surface: #ffffff;
+  --sunk: #f6f8f7;
+  --ink: #142a24;
+  --muted: #5a6d67;
+  --line: #d3ddd8;
+  --accent: #1d6a56;
+  --accent-ink: #ffffff;
+  --brass: #9c6a14;
+  --good: #2b7a4c;
+  --bad: #b3261e;
+  --warn: #8f6200;
+  --good-bg: #e3f2e8;
+  --bad-bg: #fbe7e5;
+  --warn-bg: #fbf0d9;
+  --font-body: "IBM Plex Sans Arabic", "Segoe UI", Tahoma, sans-serif;
+  --font-display: "Noto Kufi Arabic", "IBM Plex Sans Arabic", "Segoe UI", Tahoma, sans-serif;
+  --r: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0d1613; --surface: #14201c; --sunk: #101a17; --ink: #e2ebe7; --muted: #93a69f; --line: #283732;
+    --accent: #5db797; --accent-ink: #0b1411; --brass: #d8a54b; --good: #6cc28f; --bad: #f08a80; --warn: #e2b54c;
+    --good-bg: #16301f; --bad-bg: #3a1a17; --warn-bg: #33290f; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0d1613; --surface: #14201c; --sunk: #101a17; --ink: #e2ebe7; --muted: #93a69f; --line: #283732;
+  --accent: #5db797; --accent-ink: #0b1411; --brass: #d8a54b; --good: #6cc28f; --bad: #f08a80; --warn: #e2b54c;
+  --good-bg: #16301f; --bad-bg: #3a1a17; --warn-bg: #33290f; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+.gate { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding-block: 24px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.gatecard { width: 100%; max-width: 380px; }
+.gatecard form { display: flex; flex-direction: column; gap: 12px; }
+.linkbtn { border: 0; background: none; color: var(--accent); padding: 0; font-size: .85rem; text-decoration: underline; }
+body { background: var(--paper); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.6; }
+.app { max-width: 1100px; margin: 0 auto; padding-block: 20px 48px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 18px; }
+.num { font-variant-numeric: tabular-nums; direction: ltr; unicode-bidi: isolate; white-space: nowrap; }
+h1, h2, h3 { font-family: var(--font-display); margin: 0; text-wrap: balance; }
+h1 { font-size: 1.35rem; }
+h2 { font-size: 1.05rem; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Top bar */
+.top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+.brand { display: flex; flex-direction: column; gap: 2px; }
+.brand small { color: var(--muted); font-size: .85rem; }
+.monthbar { display: flex; align-items: center; gap: 6px; background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 4px; }
+.monthbar button { border: 0; background: transparent; width: 34px; height: 34px; border-radius: 50%; font-size: 1.1rem; line-height: 1; }
+.monthbar button:hover { background: var(--sunk); }
+.monthbar .label { min-width: 150px; text-align: center; font-weight: 600; }
+.pill { display: inline-flex; align-items: center; gap: 6px; font-size: .78rem; font-weight: 600; padding: 2px 10px; border-radius: 999px; letter-spacing: .01em; }
+.pill.open { background: var(--warn-bg); color: var(--warn); }
+.pill.closed { background: var(--good-bg); color: var(--good); }
+.pill.bad { background: var(--bad-bg); color: var(--bad); }
+.pill.muted { background: var(--sunk); color: var(--muted); border: 1px solid var(--line); }
+.tools { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+/* Figures */
+[hidden] { display: none !important; }
+.figures { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; }
+.fig { background: var(--surface); padding: 14px 16px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.fig .k { color: var(--muted); font-size: .82rem; }
+.fig .v { font-size: 1.35rem; font-weight: 700; }
+.fig .s { color: var(--muted); font-size: .78rem; }
+.fig.hand { background: var(--sunk); }
+.fig.hand .v { color: var(--accent); }
+.fig.owed .v { color: var(--brass); }
+.cur { font-size: .7em; font-weight: 500; color: var(--muted); margin-inline-start: 4px; }
+
+.banner { border-radius: var(--r); padding: 10px 14px; font-size: .9rem; border: 1px solid; }
+.banner.warn { background: var(--warn-bg); color: var(--warn); border-color: color-mix(in srgb, var(--warn) 30%, transparent); }
+.banner.bad { background: var(--bad-bg); color: var(--bad); border-color: color-mix(in srgb, var(--bad) 30%, transparent); }
+.banner.info { background: var(--surface); color: var(--muted); border-color: var(--line); }
+
+/* Tabs */
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); overflow-x: auto; }
+.tabs button { border: 0; background: transparent; padding: 10px 14px; font-weight: 600; color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; }
+.tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+.tabs .count { font-weight: 500; font-size: .8rem; color: var(--muted); }
+
+.work { display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 1fr); gap: 18px; align-items: start; }
+@media (max-width: 820px) { .work { grid-template-columns: minmax(0, 1fr); } }
+
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 16px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.card.form { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); }
+@media (max-width: 820px) { .card.form { position: static; } }
+.hint { color: var(--muted); font-size: .82rem; margin: 0; }
+
+.field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.field > span { font-size: .82rem; color: var(--muted); font-weight: 500; }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+input[type=text], input[type=number], input[type=date], select, textarea { width: 100%; background: var(--sunk); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; min-width: 0; }
+input[type=number] { direction: ltr; text-align: right; }
+input:disabled, select:disabled, button:disabled { opacity: .55; cursor: not-allowed; }
+.seg { display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--sunk); }
+.seg label { flex: 1; text-align: center; padding: 7px 6px; font-size: .85rem; cursor: pointer; border-inline-start: 1px solid var(--line); }
+.seg label:first-child { border-inline-start: 0; }
+.seg input { position: absolute; opacity: 0; pointer-events: none; }
+.seg label:has(input:checked) { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.seg label:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: -2px; }
+.check { display: flex; gap: 8px; align-items: center; font-size: .9rem; }
+.check input { width: 18px; height: 18px; accent-color: var(--accent); }
+
+.btn { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 8px 14px; font-weight: 600; }
+.btn:hover:not(:disabled) { background: var(--sunk); }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.btn.primary:hover:not(:disabled) { filter: brightness(1.08); background: var(--accent); }
+.btn.danger { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 40%, var(--line)); }
+.btn.sm { padding: 4px 10px; font-size: .82rem; }
+.err { color: var(--bad); font-size: .85rem; min-height: 1em; margin: 0; }
+.ok { color: var(--good); font-size: .85rem; margin: 0; }
+
+/* Lists */
+.listhead { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chips button { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 3px 12px; font-size: .82rem; }
+.chips button[aria-pressed="true"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.search { max-width: 220px; }
+.entries { display: flex; flex-direction: column; }
+.entry { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; padding: 12px 2px; border-top: 1px solid var(--line); }
+.entry:first-child { border-top: 0; }
+.entry .who { font-weight: 600; overflow-wrap: anywhere; }
+.entry .meta { color: var(--muted); font-size: .8rem; display: flex; flex-wrap: wrap; gap: 4px 10px; }
+.entry .amt { font-weight: 700; text-align: left; }
+.entry .side { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.entry .acts { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.entry.unpaid .amt { color: var(--brass); }
+.tag { font-size: .72rem; padding: 1px 8px; border-radius: 999px; background: var(--sunk); border: 1px solid var(--line); color: var(--muted); }
+.tag.due { background: var(--bad-bg); color: var(--bad); border-color: transparent; }
+.tag.paid { background: var(--good-bg); color: var(--good); border-color: transparent; }
+.tag.unpaid { background: var(--warn-bg); color: var(--warn); border-color: transparent; }
+.tag.old { background: transparent; color: var(--brass); border-color: color-mix(in srgb, var(--brass) 40%, transparent); }
+.inline { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; background: var(--sunk); border-radius: 8px; padding: 6px 8px; }
+.inline input[type=date] { width: auto; padding: 4px 8px; background: var(--surface); }
+.empty { padding: 28px 8px; text-align: center; color: var(--muted); }
+.totalrow { display: flex; justify-content: space-between; gap: 12px; padding-top: 10px; border-top: 2px solid var(--ink); font-weight: 700; }
+
+/* Statement */
+.statement { display: flex; flex-direction: column; }
+.line { display: flex; align-items: baseline; gap: 8px; padding: 7px 0; }
+.line .lbl { flex: 0 1 auto; }
+.line .dots { flex: 1 1 24px; border-bottom: 1px dotted var(--line); transform: translateY(-4px); min-width: 12px; }
+.line .val { font-weight: 600; }
+.line.sub { padding-inline-start: 18px; color: var(--muted); font-size: .88rem; }
+.line.sum { border-top: 2px solid var(--ink); margin-top: 4px; padding-top: 10px; font-weight: 700; font-size: 1.05rem; }
+.line.sum .val { color: var(--accent); font-weight: 700; }
+.op { display: inline-block; width: 1.2em; color: var(--muted); font-weight: 700; }
+.diff.short { color: var(--bad); }
+.diff.over { color: var(--good); }
+.cols2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px; align-items: start; }
+.confirm { border: 1px solid color-mix(in srgb, var(--warn) 40%, var(--line)); background: var(--warn-bg); color: var(--ink); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.mini { width: 100%; border-collapse: collapse; font-size: .85rem; }
+.mini td { padding: 5px 0; border-top: 1px solid var(--line); }
+.mini td:last-child { text-align: left; }
+.scroll { overflow-x: auto; }
+.loading { color: var(--muted); font-size: .85rem; }
+@media (max-width: 640px) { .figures { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 480px) { .row2 { grid-template-columns: 1fr; } .monthbar .label { min-width: 120px; } .fig .v { font-size: 1.15rem; } }
+@media (prefers-reduced-motion: no-preference) { .fig .v, .line .val { transition: color .2s; } }
+</style>
+
+</head>
+<body>
+<div class="gate" id="gate">
+  <div class="card gatecard">
+    <h1>عهدة المشتريات</h1>
+    <p class="hint">ومصاريف المطعم</p>
+    <div class="banner bad" id="cfgMissing" hidden>إعدادات Firebase ناقصة. افتح الملف config.js والصق فيه إعدادات المشروع، كما في دليل التشغيل.</div>
+    <p class="loading" id="gateLoading">جارِ التحميل...</p>
+    <form id="loginForm" hidden autocomplete="on">
+      <label class="field"><span>الإيميل</span><input id="lEmail" type="email" required autocomplete="username" dir="ltr"></label>
+      <label class="field"><span>كلمة السر</span><input id="lPass" type="password" required autocomplete="current-password" dir="ltr"></label>
+      <button class="btn primary" type="submit">دخول</button>
+      <p class="err" id="lErr"></p>
+      <div class="tools"><button class="linkbtn" type="button" id="toReg">ما عندك حساب؟ سجّل</button><button class="linkbtn" type="button" id="forgot">نسيت كلمة السر</button></div>
+    </form>
+    <form id="regForm" hidden autocomplete="on">
+      <label class="field"><span>الاسم</span><input id="rName" type="text" required maxlength="60"></label>
+      <label class="field"><span>الإيميل</span><input id="rEmail" type="email" required autocomplete="username" dir="ltr"></label>
+      <label class="field"><span>كلمة السر (6 أحرف على الأقل)</span><input id="rPass" type="password" required minlength="6" autocomplete="new-password" dir="ltr"></label>
+      <button class="btn primary" type="submit">تسجيل</button>
+      <p class="err" id="rErr"></p>
+      <button class="linkbtn" type="button" id="toLogin">عندك حساب؟ ادخل</button>
+    </form>
+    <div id="pendingBox" hidden>
+      <p><strong>حسابك بانتظار موافقة المدير.</strong></p>
+      <p class="hint">بعد ما يوافق المدير على حسابك، تفتح الصفحة تلقائياً.</p>
+    </div>
+    <div class="tools" id="gateOut" hidden><span class="hint" id="gateWho"></span><button class="btn sm" type="button" id="gateLogout">خروج</button></div>
+  </div>
+</div>
+
+<div class="app" id="app" hidden>
+  <header class="top">
+    <div class="brand">
+      <h1>عهدة المشتريات</h1>
+      <small id="who">موظف المشتريات</small>
+    </div>
+    <div class="tools">
+      <div class="monthbar" role="group" aria-label="الشهر">
+        <button id="prevM" type="button" aria-label="الشهر السابق">&#8250;</button>
+        <span class="label" id="monthLabel">...</span>
+        <button id="nextM" type="button" aria-label="الشهر التالي">&#8249;</button>
+      </div>
+      <span id="statusPill" class="pill muted">...</span>
+      <button id="exportBtn" class="btn sm" type="button" hidden>تصدير CSV</button>
+      <button id="settingsBtn" class="btn sm" type="button" hidden>الإعدادات</button>
+      <button id="usersBtn" class="btn sm" type="button" hidden>الحسابات</button>
+      <span class="hint" id="meName"></span>
+      <button id="logoutBtn" class="btn sm" type="button">خروج</button>
+    </div>
+  </header>
+
+  <section class="card" id="usersCard" hidden>
+    <div class="listhead"><h2>الحسابات</h2><button id="closeUsers" class="btn sm" type="button">إغلاق</button></div>
+    <p class="hint">المدير يسجّل ويقفل الأشهر ويوافق على الحسابات. المشاهد (مثل صاحب المطعم) يرى كل شيء ولا يعدّل.</p>
+    <div class="entries" id="usersList"></div>
+  </section>
+
+  <section class="card" id="settingsCard" hidden>
+    <h2>الإعدادات</h2>
+    <div class="row2">
+      <label class="field"><span>اسم موظف المشتريات</span><input id="setEmployee" type="text" maxlength="60"></label>
+      <label class="field"><span>العملة</span><input id="setCurrency" type="text" maxlength="10"></label>
+    </div>
+    <label class="field"><span>عدد الخانات العشرية</span>
+      <select id="setDecimals"><option value="3">3 (فلس)</option><option value="2">2 (قرش / سنت)</option><option value="0">بدون كسور</option></select>
+    </label>
+    <div class="tools"><button id="saveSettings" class="btn primary" type="button">حفظ</button><button id="closeSettings" class="btn" type="button">إغلاق</button><p id="setMsg" class="err"></p></div>
+  </section>
+
+  <div id="banners"></div>
+  <section class="figures" id="figures" aria-live="polite"></section>
+
+  <nav class="tabs" role="tablist">
+    <button role="tab" id="tab-invoices" aria-selected="true" type="button">الفواتير والمصاريف <span class="count" id="cntInv"></span></button>
+    <button role="tab" id="tab-receipts" aria-selected="false" type="button">العهدة المستلمة <span class="count" id="cntRec"></span></button>
+    <button role="tab" id="tab-close" aria-selected="false" type="button">كشف وإقفال الشهر</button>
+  </nav>
+
+  <!-- Invoices -->
+  <section class="work" id="panel-invoices">
+    <form class="card form" id="invForm" autocomplete="off">
+      <h2>تسجيل فاتورة أو مصروف</h2>
+      <div class="row2">
+        <label class="field"><span>التاريخ</span><input id="invDate" type="date" required></label>
+        <label class="field"><span>المبلغ</span><input id="invAmount" type="number" min="0" step="any" inputmode="decimal" required></label>
+      </div>
+      <label class="field"><span>المورد أو الجهة</span><input id="invParty" type="text" list="parties" maxlength="80" required placeholder="مثال: مخبز الشرق، محطة الوقود"></label>
+      <datalist id="parties"></datalist>
+      <label class="check"><input id="invPaid" type="checkbox" checked>سُدّدت من العهدة بنفس التاريخ</label>
+      <p class="hint">اترك الخيار فارغاً إذا بقيت الفاتورة دون سداد، وسدّدها لاحقاً من القائمة.</p>
+      <button class="btn primary" type="submit" id="invSubmit">إضافة</button>
+      <p class="err" id="invErr"></p>
+    </form>
+    <div class="card">
+      <div class="listhead">
+        <div class="chips" id="invFilters">
+          <button type="button" data-f="all" aria-pressed="true">الكل</button>
+          <button type="button" data-f="unpaid" aria-pressed="false">غير مدفوعة</button>
+          <button type="button" data-f="paid" aria-pressed="false">مدفوعة</button>
+        </div>
+        <input id="invSearch" class="search" type="text" placeholder="بحث بالمورد">
+      </div>
+      <div class="entries" id="invList"><p class="empty loading">جارِ تحميل البيانات...</p></div>
+    </div>
+  </section>
+
+  <!-- Receipts -->
+  <section class="work" id="panel-receipts" hidden>
+    <form class="card form" id="recForm" autocomplete="off">
+      <h2>تسليم عهدة للموظف</h2>
+      <p class="hint">كل مبلغ يستلمه الموظف (مثلاً 1,500 كل 3 أو 4 أيام).</p>
+      <div class="row2">
+        <label class="field"><span>التاريخ</span><input id="recDate" type="date" required></label>
+        <label class="field"><span>المبلغ</span><input id="recAmount" type="number" min="0" step="any" inputmode="decimal" required></label>
+      </div>
+      <label class="field"><span>ملاحظة</span><input id="recNote" type="text" maxlength="120" placeholder="مثال: من الخزنة، تحويل"></label>
+      <button class="btn primary" type="submit" id="recSubmit">تسجيل الاستلام</button>
+      <p class="err" id="recErr"></p>
+    </form>
+    <div class="card">
+      <div class="entries" id="recList"></div>
+    </div>
+  </section>
+
+  <!-- Close -->
+  <section id="panel-close" hidden>
+    <div class="cols2">
+      <div class="card" id="statementCard"></div>
+      <div style="display:flex;flex-direction:column;gap:18px;min-width:0">
+        <div class="card" id="closeCard">
+          <h2>إقفال الشهر</h2>
+          <div id="closeOpenBox">
+            <div style="display:flex;flex-direction:column;gap:12px">
+              <label class="field"><span>المبلغ الفعلي بيد الموظف آخر الشهر (جرد النقد)</span><input id="countedInput" type="number" min="0" step="any" inputmode="decimal"></label>
+              <div id="diffLine" class="hint"></div>
+              <label class="field"><span>ملاحظة الإقفال</span><input id="closeNote" type="text" maxlength="200"></label>
+              <div id="closeChecks"></div>
+              <button id="closeBtn" class="btn primary" type="button">إقفال الشهر</button>
+              <div id="closeConfirm" class="confirm" hidden>
+                <strong id="closeConfirmText"></strong>
+                <span class="hint">بعد الإقفال لا يمكن إضافة أو تعديل أي فاتورة أو عهدة بتاريخ هذا الشهر، ويُرحَّل الرصيد الفعلي كعهدة أول المدة للشهر التالي، وتُرحَّل الفواتير غير المدفوعة معه.</span>
+                <div class="tools"><button id="closeYes" class="btn primary" type="button">نعم، أقفل الشهر</button><button id="closeNo" class="btn" type="button">تراجع</button></div>
+              </div>
+              <p id="closeErr" class="err"></p>
+            </div>
+          </div>
+          <div id="closeDoneBox" hidden></div>
+        </div>
+        <div class="card" id="unpaidCard"></div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var MONTHS = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
+
+  var S = {
+    db: null, user: null, downloads: null, uid: null,
+    canEdit: false, canWrite: false, readOnly: true,
+    invoices: [], receipts: [], months: {},
+    settings: { employee: "", currency: "د.ك", decimals: 3 },
+    loaded: { inv: false, rec: false, mon: false, set: false },
+    stale: false, dbMissing: false,
+    month: ymNow(), tab: "invoices", filter: "all", search: "",
+    paying: null, payDate: "", confirmDel: null, names: {}
+  };
+
+  // ---------- dates ----------
+  function p2(n) { return (n < 10 ? "0" : "") + n; }
+  function today() { var d = new Date(); return d.getFullYear() + "-" + p2(d.getMonth() + 1) + "-" + p2(d.getDate()); }
+  function ymNow() { return today().slice(0, 7); }
+  function addMonth(ym, k) { var y = +ym.slice(0, 4), m = +ym.slice(5, 7) - 1 + k; y += Math.floor(m / 12); m = ((m % 12) + 12) % 12; return y + "-" + p2(m + 1); }
+  function monthEnd(ym) { var y = +ym.slice(0, 4), m = +ym.slice(5, 7); return ym + "-" + p2(new Date(Date.UTC(y, m, 0)).getUTCDate()); }
+  function monthName(ym) { return MONTHS[+ym.slice(5, 7) - 1] + " " + ym.slice(0, 4); }
+  function addDays(date, n) { var d = new Date(date + "T00:00:00Z"); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); }
+  function fmtDate(d) { if (!d) return ""; return +d.slice(8, 10) + " " + MONTHS[+d.slice(5, 7) - 1]; }
+  function validDate(d) { return /^\d{4}-\d{2}-\d{2}$/.test(d || ""); }
+
+  // ---------- money: everything is summed in whole minor units ----------
+  function unit() { return Math.pow(10, S.settings.decimals); }
+  function toU(x) { var n = Number(x); return isFinite(n) ? Math.round(n * unit()) : 0; }
+  function fromU(u) { return u / unit(); }
+  function sumU(list) { var t = 0; for (var i = 0; i < list.length; i++) t += toU(list[i].amount); return t; }
+  function money(u, withCur) {
+    var d = S.settings.decimals;
+    var s = fromU(Math.abs(u)).toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
+    return '<span class="num">' + (u < 0 ? "-" : "") + s + "</span>" + (withCur === false ? "" : '<span class="cur">' + esc(S.settings.currency) + "</span>");
+  }
+  function moneyPlain(u) { var d = S.settings.decimals; return fromU(u).toFixed(d); }
+  function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
+  function $(id) { return document.getElementById(id); }
+
+  // ---------- the ledger ----------
+  function isClosed(ym) { var m = S.months[ym]; return !!(m && m.status === "closed"); }
+  function paidBy(inv, date) { return !!(inv.paid && inv.paidDate && inv.paidDate <= date); }
+
+  // Every month from the first one with data to the latest, in order, so each
+  // month's opening is the previous month's closing (counted cash once closed).
+  function ledger() {
+    var cur = ymNow(), lo = S.month < cur ? S.month : cur, hi = S.month > cur ? S.month : cur;
+    function touch(ym) { if (!ym || !/^\d{4}-\d{2}$/.test(ym)) return; if (ym < lo) lo = ym; if (ym > hi) hi = ym; }
+    S.invoices.forEach(function (i) { touch(i.month); if (i.paid) touch(i.paidMonth); });
+    S.receipts.forEach(function (r) { touch(r.month); });
+    Object.keys(S.months).forEach(touch);
+    var out = {}, prev = null, guard = 0;
+    for (var ym = lo; ym <= hi && guard < 240; ym = addMonth(ym, 1), guard++) {
+      var doc = S.months[ym] || {}, start = ym + "-01", end = monthEnd(ym);
+      var closed = doc.status === "closed";
+      var prevClosed = !!(prev && prev.closed);
+      var carried = prev ? prev.closing : 0;
+      var openingFixed = !prevClosed && typeof doc.opening === "number";
+      var opening = openingFixed ? toU(doc.opening) : carried;
+      var rec = S.receipts.filter(function (r) { return r.month === ym; });
+      var paidHere = S.invoices.filter(function (i) { return i.paid && i.paidMonth === ym; });
+      var paidOwn = paidHere.filter(function (i) { return i.month === ym; });
+      var paidOld = paidHere.filter(function (i) { return i.month < ym; });
+      var own = S.invoices.filter(function (i) { return i.month === ym; });
+      var asOf = ym === cur ? today() : end;
+      var unpaidEnd = S.invoices.filter(function (i) { return i.date <= end && !paidBy(i, end); });
+      var carriedIn = S.invoices.filter(function (i) { return i.date < start && !paidBy(i, addDays(start, -1)); });
+      var received = sumU(rec), paid = sumU(paidHere);
+      var expected = opening + received - paid;
+      var counted = closed && typeof doc.counted === "number" ? toU(doc.counted) : null;
+      var row = {
+        ym: ym, doc: doc, closed: closed, prev: prev, prevClosed: prevClosed, carried: carried,
+        openingFixed: openingFixed, opening: opening, receipts: rec, received: received,
+        paidHere: paidHere, paid: paid, paidOwn: sumU(paidOwn), paidOld: sumU(paidOld), paidOldCount: paidOld.length,
+        expected: expected, counted: counted, closing: counted != null ? counted : expected,
+        own: own, purchases: sumU(own),
+        ownPaid: sumU(own.filter(function (i) { return paidBy(i, end); })),
+        unpaidEnd: unpaidEnd, unpaidTotal: sumU(unpaidEnd),
+        carriedIn: carriedIn, carriedInTotal: sumU(carriedIn), asOf: asOf
+      };
+      out[ym] = row; prev = row;
+    }
+    return out;
+  }
+
+
+  // ---------- rendering ----------
+  function allLoaded() { return S.loaded.inv && S.loaded.rec && S.loaded.mon; }
+
+  function render() {
+    var L = ledger(), M = L[S.month];
+    var closed = M.closed;
+    $("monthLabel").textContent = monthName(S.month);
+    var pill = $("statusPill");
+    pill.className = "pill " + (closed ? "closed" : "open");
+    pill.textContent = closed ? "مُقفل" : (S.month === ymNow() ? "الشهر الحالي، مفتوح" : "مفتوح");
+    $("who").textContent = S.settings.employee ? "موظف المشتريات: " + S.settings.employee : "موظف المشتريات";
+    $("settingsBtn").hidden = !S.canEdit;
+    $("exportBtn").hidden = !S.downloads;
+    renderBanners(L, M);
+    renderFigures(M);
+    renderForms(M);
+    renderInvoices(M);
+    renderReceipts(M);
+    renderClose(L, M);
+    resolveNames();
+  }
+
+  function renderBanners(L, M) {
+    var b = [];
+    if (S.dbMissing) b.push('<div class="banner bad">تعذّر الاتصال بقاعدة البيانات. تأكد من الإنترنت ثم حدّث الصفحة.</div>');
+    else if (S.stale) b.push('<div class="banner warn">تعذّر الوصول إلى البيانات حتى الآن. الأرقام الظاهرة قد لا تكون محدّثة.</div>');
+    if (!S.dbMissing && S.readOnly && allLoaded()) b.push('<div class="banner info">حسابك للمشاهدة فقط.</div>');
+    if (M.closed && M.doc.snap && M.doc.snap.expected !== moneyPlain(M.expected)) {
+      b.push('<div class="banner bad">تغيّرت بيانات هذا الشهر بعد إقفاله: الرصيد المفترض وقت الإقفال كان ' + esc(M.doc.snap.expected) + " والآن " + money(M.expected) + ". راجع الفواتير أو أعد فتح الشهر وأقفله من جديد.</div>");
+    }
+    // An earlier month left open makes every later opening provisional.
+    var openEarlier = Object.keys(L).filter(function (ym) { var r = L[ym]; return ym < S.month && !r.closed && (r.own.length || r.receipts.length || r.paidHere.length); });
+    if (openEarlier.length) b.push('<div class="banner warn">' + openEarlier.map(monthName).join("، ") + " لم يُقفل بعد، فرصيد أول المدة لهذا الشهر محسوب وغير نهائي.</div>");
+    $("banners").innerHTML = b.join("");
+    $("banners").hidden = !b.length;
+  }
+
+  function renderFigures(M) {
+    var handLabel = M.closed ? "عهدة آخر المدة (الفعلي)" : "الرصيد المفترض بيد الموظف";
+    var unpaidNow = M.unpaidEnd.length;
+    var h = "";
+    h += fig("رصيد أول المدة", money(M.opening), M.prevClosed ? "مُرحّل من " + monthName(M.prev.ym) : (M.openingFixed ? "مُدخل يدوياً" : (M.prev ? "محسوب من " + monthName(M.prev.ym) : "لم يُحدَّد بعد")));
+    h += fig("العهدة المستلمة", money(M.received), M.receipts.length + " دفعة");
+    h += fig("المدفوع من العهدة", money(M.paid), M.paidHere.length + " فاتورة" + (M.paidOldCount ? "، منها " + M.paidOldCount + " من أشهر سابقة" : ""));
+    h += fig(handLabel, money(M.closing), M.closed && M.counted !== M.expected ? diffText(M.counted - M.expected) : "أول المدة + المستلم - المدفوع", "hand");
+    h += fig("فواتير غير مدفوعة", money(M.unpaidTotal), unpaidNow + " فاتورة حتى " + fmtDate(M.ym === ymNow() ? today() : monthEnd(M.ym)), "owed");
+    h += fig("مصروفات الشهر", money(M.purchases), M.own.length + " فاتورة بتاريخ هذا الشهر");
+    $("figures").innerHTML = h;
+  }
+  function fig(k, v, s, cls) { return '<div class="fig ' + (cls || "") + '"><span class="k">' + k + '</span><span class="v">' + v + '</span><span class="s">' + esc(s || "") + "</span></div>"; }
+  function diffText(d) { if (d === 0) return "مطابق"; var s = moneyPlainAbs(d) + " " + S.settings.currency; return d < 0 ? "عجز " + s : "زيادة " + s; }
+  function moneyPlainAbs(u) { var d = S.settings.decimals; return fromU(Math.abs(u)).toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d }); }
+
+  var lastFormMonth = null;
+  function renderForms(M) {
+    var locked = M.closed || S.readOnly;
+    ["invDate", "invAmount", "invParty", "invPaid", "invSubmit"].forEach(function (id) { $(id).disabled = locked; });
+    var recLocked = M.closed || !S.canEdit;
+    ["recDate", "recAmount", "recNote", "recSubmit"].forEach(function (id) { $(id).disabled = recLocked; });
+    if (lastFormMonth !== S.month) {
+      lastFormMonth = S.month;
+      var d = S.month === ymNow() ? today() : (S.month < ymNow() ? monthEnd(S.month) : S.month + "-01");
+      $("invDate").value = d; $("recDate").value = d;
+      $("invDate").min = $("recDate").min = S.month + "-01";
+      $("invDate").max = $("recDate").max = monthEnd(S.month);
+    }
+    $("invErr").textContent = M.closed ? "هذا الشهر مُقفل. انتقل إلى شهر مفتوح للتسجيل." : (S.readOnly && allLoaded() ? "لا تملك صلاحية التسجيل." : ($("invErr").dataset.msg || ""));
+    $("recErr").textContent = M.closed ? "هذا الشهر مُقفل." : (!S.canEdit && allLoaded() ? "تسليم العهدة يسجّله المدير فقط." : ($("recErr").dataset.msg || ""));
+    var parties = {};
+    S.invoices.forEach(function (i) { if (i.party) parties[i.party] = 1; });
+    $("parties").innerHTML = Object.keys(parties).sort().map(function (p) { return '<option value="' + esc(p) + '">'; }).join("");
+  }
+
+  function monthInvoices(M) {
+    var end = monthEnd(M.ym), start = M.ym + "-01";
+    return S.invoices.filter(function (i) {
+      if (i.month === M.ym) return true;
+      if (i.month < M.ym) return !paidBy(i, addDays(start, -1)); // carried in, unpaid at the start
+      return false;
+    }).sort(function (a, b) { return a.date < b.date ? 1 : a.date > b.date ? -1 : (a.at < b.at ? 1 : -1); });
+  }
+
+  function renderInvoices(M) {
+    var end = monthEnd(M.ym), asOf = M.asOf;
+    var all = monthInvoices(M);
+    $("cntInv").textContent = all.length ? "(" + all.length + ")" : "";
+    var q = S.search.trim().toLowerCase();
+    var list = all.filter(function (i) {
+      var p = paidBy(i, end);
+      if (S.filter === "unpaid" && p) return false;
+      if (S.filter === "paid" && !p) return false;
+      if (q && (String(i.party || "") + " " + String(i.no || "") + " " + String(i.note || "")).toLowerCase().indexOf(q) < 0) return false;
+      return true;
+    });
+    if (!S.loaded.inv) { $("invList").innerHTML = '<p class="empty loading">جارِ تحميل الفواتير...</p>'; return; }
+    if (!all.length) { $("invList").innerHTML = '<p class="empty">لا توجد فواتير لهذا الشهر بعد. سجّل أول فاتورة من النموذج: المورد والمبلغ، وهل سُدّدت من العهدة.</p>'; return; }
+    if (!list.length) { $("invList").innerHTML = '<p class="empty">لا توجد فواتير تطابق هذا الفلتر.</p>'; return; }
+    var h = list.map(function (i) {
+      var p = paidBy(i, end), old = i.month < M.ym;
+      var tags = [];
+      tags.push(p ? '<span class="tag paid">مدفوعة ' + esc(fmtDate(i.paidDate)) + "</span>" : '<span class="tag unpaid">غير مدفوعة</span>');
+      if (!p && i.paid && i.paidDate > end) tags.push('<span class="tag">سُدّدت لاحقاً ' + esc(fmtDate(i.paidDate)) + "</span>");
+      if (old) tags.push('<span class="tag old">مُرحّلة من ' + esc(monthName(i.month)) + "</span>");
+      var meta = [esc(fmtDate(i.date))];
+      if (i.by && S.names[i.by]) meta.push("سجّلها " + esc(S.names[i.by]));
+      var acts = invActions(i, M);
+      return '<div class="entry' + (p ? "" : " unpaid") + '" data-id="' + esc(i.id) + '">' +
+        '<div><div class="who">' + esc(i.party) + '</div><div class="meta">' + meta.join("<span>·</span>") + "</div></div>" +
+        '<div class="side"><span class="amt">' + money(toU(i.amount)) + '</span><div class="chips">' + tags.join("") + "</div></div>" +
+        (acts ? '<div class="acts">' + acts + "</div>" : "") + "</div>";
+    }).join("");
+    var tot = sumU(list), unp = sumU(list.filter(function (i) { return !paidBy(i, end); }));
+    h += '<div class="totalrow"><span>المجموع (' + list.length + ")</span><span>" + money(tot) + "</span></div>";
+    if (unp && S.filter !== "paid") h += '<div class="line sub"><span class="lbl">منها غير مدفوع</span><span class="dots"></span><span class="val">' + money(unp) + "</span></div>";
+    $("invList").innerHTML = h;
+  }
+
+  function invActions(i, M) {
+    if (S.readOnly) return "";
+    if (S.confirmDel === i.id) {
+      return '<div class="inline"><span>حذف هذه الفاتورة نهائياً؟</span><button class="btn sm danger" data-act="delYes" type="button">حذف</button><button class="btn sm" data-act="delNo" type="button">تراجع</button></div>';
+    }
+    if (S.paying === i.id) {
+      return '<div class="inline"><span>تاريخ السداد</span><input type="date" id="payDate" value="' + esc(S.payDate) + '" min="' + esc(i.date) + '"><button class="btn sm primary" data-act="payYes" type="button">تأكيد السداد من العهدة</button><button class="btn sm" data-act="payNo" type="button">تراجع</button></div>';
+    }
+    var a = [];
+    var editableHere = !isClosed(i.month) && !(i.paid && isClosed(i.paidMonth));
+    if (!i.paid && !M.closed) a.push('<button class="btn sm primary" data-act="pay" type="button">سداد من العهدة</button>');
+    if (i.paid && !isClosed(i.paidMonth) && (i.paidMonth === M.ym || i.month === M.ym)) a.push('<button class="btn sm" data-act="unpay" type="button">إلغاء السداد</button>');
+    if (editableHere && i.month === M.ym) a.push('<button class="btn sm danger" data-act="del" type="button">حذف</button>');
+    return a.join("");
+  }
+
+  function renderReceipts(M) {
+    var list = M.receipts.slice().sort(function (a, b) { return a.date < b.date ? 1 : a.date > b.date ? -1 : 0; });
+    $("cntRec").textContent = list.length ? "(" + list.length + ")" : "";
+    if (!S.loaded.rec) { $("recList").innerHTML = '<p class="empty loading">جارِ التحميل...</p>'; return; }
+    if (!list.length) { $("recList").innerHTML = '<p class="empty">لم تُسجَّل أي عهدة مستلمة لهذا الشهر. كل مبلغ يُسلَّم للموظف يُسجَّل هنا بتاريخه.</p>'; return; }
+    var h = list.map(function (r) {
+      var acts = "";
+      if (S.canEdit && !M.closed) {
+        acts = S.confirmDel === r.id
+          ? '<div class="inline"><span>حذف هذا الاستلام؟</span><button class="btn sm danger" data-act="delRecYes" type="button">حذف</button><button class="btn sm" data-act="delNo" type="button">تراجع</button></div>'
+          : '<button class="btn sm danger" data-act="delRec" type="button">حذف</button>';
+      }
+      var meta = [esc(fmtDate(r.date))];
+      if (r.by && S.names[r.by]) meta.push("سجّلها " + esc(S.names[r.by]));
+      return '<div class="entry" data-id="' + esc(r.id) + '"><div><div class="who">' + (r.note ? esc(r.note) : "استلام عهدة") + '</div><div class="meta">' + meta.join("<span>·</span>") + '</div></div><div class="side"><span class="amt">' + money(toU(r.amount)) + "</span></div>" + (acts ? '<div class="acts">' + acts + "</div>" : "") + "</div>";
+    }).join("");
+    h += '<div class="totalrow"><span>مجموع المستلم</span><span>' + money(M.received) + "</span></div>";
+    $("recList").innerHTML = h;
+  }
+
+  function line(lbl, val, cls, op) { return '<div class="line ' + (cls || "") + '"><span class="lbl">' + (op ? '<span class="op">' + op + "</span>" : "") + lbl + '</span><span class="dots"></span><span class="val">' + val + "</span></div>"; }
+
+  function renderClose(L, M) {
+    var h = '<h2>كشف عهدة ' + esc(monthName(M.ym)) + "</h2>";
+    if (S.settings.employee) h += '<p class="hint">الموظف: ' + esc(S.settings.employee) + "</p>";
+    h += '<div class="statement">';
+    var openingVal = money(M.opening);
+    var canSetOpening = S.canEdit && !M.closed && !M.prevClosed;
+    h += line("رصيد أول المدة (عهدة أول المدة)", openingVal);
+    if (canSetOpening) {
+      h += '<div class="inline" style="margin:4px 0 8px"><span class="hint" style="flex:1 1 160px">' + (M.prev ? "الشهر السابق غير مُقفل. يمكنك إدخال الرصيد الافتتاحي يدوياً:" : "أول شهر في النظام. أدخل المبلغ الذي بيد الموظف في بداية الشهر:") + '</span><input type="number" step="any" min="0" id="openingInput" style="width:120px" value="' + (M.openingFixed ? esc(moneyPlain(M.opening)) : "") + '"><button class="btn sm primary" data-act="setOpening" type="button">حفظ</button>' + (M.openingFixed ? '<button class="btn sm" data-act="clearOpening" type="button">مسح</button>' : "") + "</div>";
+    }
+    h += line("العهدة المستلمة خلال الشهر (" + M.receipts.length + " دفعة)", money(M.received), "", "+");
+    h += line("المدفوع من العهدة", money(M.paid), "", "-");
+    h += line("فواتير هذا الشهر", money(M.paidOwn), "sub");
+    h += line("فواتير مُرحّلة من أشهر سابقة (" + M.paidOldCount + ")", money(M.paidOld), "sub");
+    h += line(M.closed ? "الرصيد المفترض وقت الإقفال" : "الرصيد المفترض بيد الموظف (عهدة آخر المدة)", money(M.expected), "sum", "=");
+    if (M.closed) {
+      var d = M.counted - M.expected;
+      h += line("المبلغ الفعلي (جرد النقد)", money(M.counted));
+      h += line("الفرق", '<span class="diff ' + (d < 0 ? "short" : d > 0 ? "over" : "") + '">' + esc(diffText(d)) + "</span>");
+    }
+    h += "</div>";
+    h += '<h2 style="margin-top:8px">كم صرف الموظف هذا الشهر</h2><div class="statement">';
+    h += line("مجموع فواتير ومصاريف الشهر", money(M.purchases), "sum");
+    h += line("مدفوع منها", money(M.ownPaid), "sub");
+    h += line("ما زال غير مدفوع", money(M.purchases - M.ownPaid), "sub");
+    h += "</div>";
+    h += '<h2 style="margin-top:8px">الموقف آخر الشهر</h2><div class="statement">';
+    h += line("النقد بيد الموظف", money(M.closing));
+    h += line("فواتير غير مدفوعة عليه أن يسدّدها", money(M.unpaidTotal), "", "-");
+    var net = M.closing - M.unpaidTotal;
+    h += line(net < 0 ? "عهدة إضافية مطلوبة لتغطية الفواتير" : "يبقى بعد سداد كل الفواتير", money(Math.abs(net)), "sum", "=");
+    h += "</div>";
+    $("statementCard").innerHTML = h;
+
+    // close box
+    $("closeOpenBox").hidden = M.closed;
+    $("closeDoneBox").hidden = !M.closed;
+    if (M.closed) {
+      var doc = M.doc, later = Object.keys(L).some(function (ym) { return ym > M.ym && L[ym].closed; });
+      var x = '<p class="ok">أُقفل هذا الشهر' + (doc.closedAt ? " في " + esc(fmtDate(doc.closedAt.slice(0, 10))) + " " + esc(doc.closedAt.slice(0, 4)) : "") + (doc.closedBy && S.names[doc.closedBy] ? " بواسطة " + esc(S.names[doc.closedBy]) : "") + ".</p>";
+      x += '<div class="statement">' + line("المبلغ الفعلي المُرحّل للشهر التالي", money(M.counted)) + line("الفرق عند الإقفال", '<span class="diff ' + (M.counted < M.expected ? "short" : M.counted > M.expected ? "over" : "") + '">' + esc(diffText(M.counted - M.expected)) + "</span>") + line("فواتير غير مدفوعة مُرحّلة", money(M.unpaidTotal) + " (" + M.unpaidEnd.length + ")") + "</div>";
+      if (doc.note) x += '<p class="hint">ملاحظة: ' + esc(doc.note) + "</p>";
+      if (S.canEdit) {
+        x += later ? '<p class="hint">لا يمكن إعادة فتح هذا الشهر لأن شهراً بعده مُقفل. أعد فتح الأشهر اللاحقة أولاً.</p>' : '<button class="btn danger" data-act="reopen" type="button">إعادة فتح الشهر</button>';
+      }
+      $("closeDoneBox").innerHTML = x;
+    } else {
+      var can = S.canEdit;
+      $("countedInput").disabled = !can; $("closeNote").disabled = !can; $("closeBtn").disabled = !can;
+      if (!can && allLoaded()) $("closeErr").textContent = "إقفال الشهر يقوم به المدير فقط.";
+      updateDiff(M);
+      var checks = [];
+      if (M.ym > ymNow()) checks.push('<div class="banner warn">هذا شهر لم يبدأ بعد.</div>');
+      else if (M.ym === ymNow() && today() < monthEnd(M.ym)) checks.push('<div class="banner warn">الشهر لم ينتهِ بعد (آخر يوم ' + esc(fmtDate(monthEnd(M.ym))) + ").</div>");
+      if (M.unpaidEnd.length) checks.push('<div class="banner warn">' + M.unpaidEnd.length + " فاتورة غير مدفوعة (" + money(M.unpaidTotal) + ") ستُرحَّل إلى الشهر التالي.</div>");
+      var prevOpen = M.prev && !M.prev.closed && (M.prev.own.length || M.prev.receipts.length || M.prev.paidHere.length);
+      if (prevOpen) checks.push('<div class="banner warn">' + esc(monthName(M.prev.ym)) + " غير مُقفل. يُفضّل إقفاله أولاً.</div>");
+      $("closeChecks").innerHTML = checks.join("");
+      $("closeConfirmText").textContent = "إقفال " + monthName(M.ym) + "؟";
+    }
+
+    // unpaid list
+    var u = M.unpaidEnd.slice().sort(function (a, b) { return a.date < b.date ? -1 : 1; });
+    var uh = "<h2>فواتير غير مدفوعة حتى " + esc(fmtDate(M.asOf)) + "</h2>";
+    if (!u.length) uh += '<p class="hint">لا توجد فواتير غير مدفوعة.</p>';
+    else {
+      uh += '<div class="scroll"><table class="mini"><tbody>' + u.map(function (i) {
+        return "<tr><td>" + esc(i.party) + '<br><span class="hint">' + esc(fmtDate(i.date)) + "</span></td><td>" + money(toU(i.amount)) + "</td></tr>";
+      }).join("") + "</tbody></table></div>";
+      uh += '<div class="totalrow"><span>المجموع (' + u.length + ")</span><span>" + money(M.unpaidTotal) + "</span></div>";
+      if (M.carriedIn.length) uh += '<p class="hint">منها ' + M.carriedIn.filter(function (i) { return !paidBy(i, monthEnd(M.ym)); }).length + " مُرحّلة من أشهر سابقة.</p>";
+    }
+    $("unpaidCard").innerHTML = uh;
+  }
+
+  function updateDiff(M) {
+    var v = $("countedInput").value;
+    if (v === "") { $("diffLine").innerHTML = "الرصيد المفترض: " + money(M.expected) + ". أدخل المبلغ الذي عدّه الموظف فعلياً."; return; }
+    var d = toU(v) - M.expected;
+    $("diffLine").innerHTML = 'الرصيد المفترض ' + money(M.expected) + ' · الفرق: <strong class="diff ' + (d < 0 ? "short" : d > 0 ? "over" : "") + '">' + esc(diffText(d)) + "</strong>";
+  }
+
+  // ---------- names of who recorded what ----------
+  var nameReq = 0;
+  function resolveNames() {
+    if (!S.user || typeof S.user.profiles !== "function") return;
+    var ids = {};
+    S.invoices.forEach(function (i) { if (i.by && !(i.by in S.names)) ids[i.by] = 1; });
+    S.receipts.forEach(function (r) { if (r.by && !(r.by in S.names)) ids[r.by] = 1; });
+    Object.keys(S.months).forEach(function (k) { var c = S.months[k].closedBy; if (c && !(c in S.names)) ids[c] = 1; });
+    var list = Object.keys(ids);
+    if (!list.length) return;
+    list.forEach(function (id) { S.names[id] = ""; });
+    var n = ++nameReq;
+    S.user.profiles(list).then(function (ps) {
+      list.forEach(function (id) { S.names[id] = (ps[id] && ps[id].name) || ""; });
+      if (n === nameReq) render();
+    }).catch(function () {});
+  }
+
+  // ---------- writes ----------
+  function fail(where, e) {
+    var msg = "تعذّر الحفظ. حاول مرة أخرى.";
+    if (e && (e.code === "invalid_argument" || e.code === "permission-denied")) msg = "لا تملك صلاحية هذا التعديل، أو الشهر مُقفل.";
+    if (e && e.code === "quota_exceeded") msg = "امتلأت مساحة التخزين لهذه الصفحة.";
+    var el = $(where); if (el) { el.dataset.msg = msg; el.textContent = msg; setTimeout(function () { el.dataset.msg = ""; }, 6000); }
+  }
+  function radio(name) { var r = document.querySelector('input[name="' + name + '"]:checked'); return r ? r.value : ""; }
+  function clean(s, n) { return String(s || "").trim().slice(0, n); }
+
+  $("invForm").addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    var err = $("invErr"); err.dataset.msg = "";
+    var date = $("invDate").value, amount = toU($("invAmount").value), party = clean($("invParty").value, 80);
+    if (!validDate(date)) return say(err, "اختر تاريخ الفاتورة.");
+    if (isClosed(date.slice(0, 7))) return say(err, monthName(date.slice(0, 7)) + " مُقفل. لا يمكن إضافة فاتورة بتاريخه.");
+    if (!party) return say(err, "اكتب اسم المورد أو الجهة.");
+    if (amount <= 0) return say(err, "أدخل مبلغاً أكبر من صفر.");
+    var paid = $("invPaid").checked;
+    var doc = {
+      date: date, month: date.slice(0, 7), party: party, amount: fromU(amount), paid: paid, paidDate: paid ? date : null, paidMonth: paid ? date.slice(0, 7) : null, by: S.uid, at: new Date().toISOString()
+    };
+    $("invSubmit").disabled = true;
+    S.db.collection("invoices").add(doc).then(function () {
+      $("invAmount").value = ""; $("invParty").value = ""; $("invPaid").checked = true;
+      err.textContent = ""; $("invParty").focus();
+    }).catch(function (e) { fail("invErr", e); }).then(function () { $("invSubmit").disabled = false; });
+  });
+
+  $("recForm").addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    var err = $("recErr"); err.dataset.msg = "";
+    var date = $("recDate").value, amount = toU($("recAmount").value);
+    if (!validDate(date)) return say(err, "اختر التاريخ.");
+    if (isClosed(date.slice(0, 7))) return say(err, monthName(date.slice(0, 7)) + " مُقفل.");
+    if (amount <= 0) return say(err, "أدخل مبلغاً أكبر من صفر.");
+    $("recSubmit").disabled = true;
+    S.db.collection("receipts").add({ date: date, month: date.slice(0, 7), amount: fromU(amount), note: clean($("recNote").value, 120), by: S.uid, at: new Date().toISOString() })
+      .then(function () { $("recAmount").value = ""; $("recNote").value = ""; err.textContent = ""; })
+      .catch(function (e) { fail("recErr", e); }).then(function () { $("recSubmit").disabled = false; });
+  });
+  function say(el, msg) { el.textContent = msg; return false; }
+
+  // Clicks inside the lists and the statement.
+  document.addEventListener("click", function (ev) {
+    var b = ev.target.closest("[data-act]"); if (!b) return;
+    var act = b.dataset.act, row = b.closest("[data-id]"), id = row ? row.dataset.id : null;
+    var inv = id ? S.invoices.find(function (x) { return x.id === id; }) : null;
+    var M = ledger()[S.month];
+    if (act === "pay" && inv) { S.paying = id; S.confirmDel = null; S.payDate = S.month === ymNow() ? today() : (today() < S.month + "-01" ? S.month + "-01" : monthEnd(S.month)); if (S.payDate < inv.date) S.payDate = inv.date; render(); }
+    else if (act === "payNo" || act === "delNo") { S.paying = null; S.confirmDel = null; render(); }
+    else if (act === "payYes" && inv) {
+      var d = S.payDate;
+      if (!validDate(d) || d < inv.date) return flash(b, "تاريخ السداد قبل تاريخ الفاتورة");
+      if (isClosed(d.slice(0, 7))) return flash(b, monthName(d.slice(0, 7)) + " مُقفل");
+      b.disabled = true;
+      S.db.doc("invoices/" + id).update({ paid: true, paidDate: d, paidMonth: d.slice(0, 7), paidBy: S.uid }).then(function () { S.paying = null; render(); }).catch(function (e) { b.disabled = false; flash(b, "تعذّر الحفظ"); });
+    }
+    else if (act === "unpay" && inv) {
+      if (isClosed(inv.paidMonth)) return;
+      b.disabled = true;
+      S.db.doc("invoices/" + id).update({ paid: false, paidDate: null, paidMonth: null, paidBy: null }).catch(function () { b.disabled = false; flash(b, "تعذّر الحفظ"); });
+    }
+    else if (act === "del" || act === "delRec") { S.confirmDel = id; S.paying = null; render(); }
+    else if (act === "delYes" && inv) { b.disabled = true; S.db.doc("invoices/" + id).delete().then(function () { S.confirmDel = null; }).catch(function () { b.disabled = false; flash(b, "تعذّر الحذف"); }); }
+    else if (act === "delRecYes" && id) { b.disabled = true; S.db.doc("receipts/" + id).delete().then(function () { S.confirmDel = null; }).catch(function () { b.disabled = false; flash(b, "تعذّر الحذف"); }); }
+    else if (act === "setOpening") {
+      var v = $("openingInput").value; if (v === "" || toU(v) < 0) return flash(b, "أدخل مبلغاً");
+      saveMonth(S.month, { opening: fromU(toU(v)) }).catch(function () { flash(b, "تعذّر الحفظ"); });
+    }
+    else if (act === "clearOpening") { var m = Object.assign({}, S.months[S.month] || {}); delete m.opening; S.db.doc("months/" + S.month).set(m).catch(function () { flash(b, "تعذّر الحفظ"); }); }
+    else if (act === "reopen") {
+      b.disabled = true;
+      saveMonth(S.month, { status: "open", reopenedAt: new Date().toISOString(), reopenedBy: S.uid }).catch(function () { b.disabled = false; flash(b, "تعذّر الحفظ"); });
+    }
+  });
+  document.addEventListener("input", function (ev) { if (ev.target.id === "payDate") S.payDate = ev.target.value; });
+  function flash(btn, msg) { var t = btn.textContent; btn.textContent = msg; setTimeout(function () { btn.textContent = t; }, 2200); return false; }
+
+  function saveMonth(ym, patch) {
+    var cur = S.months[ym] || {};
+    var next = Object.assign({}, cur, patch);
+    delete next.id;
+    return S.db.doc("months/" + ym).set(next);
+  }
+
+  // Month close
+  $("countedInput").addEventListener("input", function () { updateDiff(ledger()[S.month]); $("closeErr").textContent = ""; });
+  $("closeBtn").addEventListener("click", function () {
+    if ($("countedInput").value === "" || toU($("countedInput").value) < 0) { $("closeErr").textContent = "أدخل المبلغ الفعلي بيد الموظف قبل الإقفال (اكتب 0 إن لم يبقَ شيء)."; return; }
+    $("closeConfirm").hidden = false; $("closeBtn").hidden = true;
+  });
+  $("closeNo").addEventListener("click", function () { $("closeConfirm").hidden = true; $("closeBtn").hidden = false; });
+  $("closeYes").addEventListener("click", function () {
+    var M = ledger()[S.month], counted = toU($("countedInput").value);
+    $("closeYes").disabled = true;
+    var doc = Object.assign({}, S.months[S.month] || {}, {
+      status: "closed", counted: fromU(counted), note: clean($("closeNote").value, 200), closedAt: new Date().toISOString(), closedBy: S.uid,
+      snap: { opening: moneyPlain(M.opening), received: moneyPlain(M.received), paid: moneyPlain(M.paid), expected: moneyPlain(M.expected), purchases: moneyPlain(M.purchases), unpaid: moneyPlain(M.unpaidTotal), unpaidCount: M.unpaidEnd.length }
+    });
+    delete doc.id;
+    // Once the month before is closed, its counted cash is the opening; a typed one would only mislead.
+    if (M.prevClosed) delete doc.opening;
+    S.db.doc("months/" + S.month).set(doc).then(function () {
+      $("closeConfirm").hidden = true; $("closeBtn").hidden = false; $("countedInput").value = ""; $("closeNote").value = "";
+    }).catch(function (e) { $("closeErr").textContent = e && (e.code === "invalid_argument" || e.code === "permission-denied") ? "لا تملك صلاحية إقفال الشهر." : "تعذّر الإقفال. حاول مرة أخرى."; })
+      .then(function () { $("closeYes").disabled = false; });
+  });
+
+  // Settings
+  $("settingsBtn").addEventListener("click", function () {
+    $("setEmployee").value = S.settings.employee || ""; $("setCurrency").value = S.settings.currency || ""; $("setDecimals").value = String(S.settings.decimals);
+    $("settingsCard").hidden = false; $("setMsg").textContent = "";
+  });
+  $("closeSettings").addEventListener("click", function () { $("settingsCard").hidden = true; });
+  $("saveSettings").addEventListener("click", function () {
+    var s = { employee: clean($("setEmployee").value, 60), currency: clean($("setCurrency").value, 10) || "د.ك", decimals: +$("setDecimals").value };
+    S.db.doc("settings/main").set(s).then(function () { $("settingsCard").hidden = true; }).catch(function () { $("setMsg").textContent = "تعذّر الحفظ."; });
+  });
+
+  // Navigation
+  $("prevM").addEventListener("click", function () { S.month = addMonth(S.month, -1); resetTransient(); render(); });
+  $("nextM").addEventListener("click", function () { S.month = addMonth(S.month, 1); resetTransient(); render(); });
+  function resetTransient() { S.paying = null; S.confirmDel = null; $("closeConfirm").hidden = true; $("closeBtn").hidden = false; $("countedInput").value = ""; $("closeErr").textContent = ""; }
+  ["invoices", "receipts", "close"].forEach(function (t) {
+    $("tab-" + t).addEventListener("click", function () {
+      S.tab = t;
+      ["invoices", "receipts", "close"].forEach(function (x) { $("tab-" + x).setAttribute("aria-selected", x === t ? "true" : "false"); $("panel-" + x).hidden = x !== t; });
+      try { localStorage.setItem("custody.tab", t); } catch (e) {}
+    });
+  });
+  $("invFilters").addEventListener("click", function (ev) {
+    var b = ev.target.closest("[data-f]"); if (!b) return;
+    S.filter = b.dataset.f;
+    $("invFilters").querySelectorAll("button").forEach(function (x) { x.setAttribute("aria-pressed", x === b ? "true" : "false"); });
+    render();
+  });
+  $("invSearch").addEventListener("input", function () { S.search = this.value; render(); });
+
+  // CSV export for the accountant
+  $("exportBtn").addEventListener("click", function () {
+    if (!S.downloads) return;
+    var M = ledger()[S.month], end = monthEnd(S.month);
+    function c(v) { v = String(v == null ? "" : v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }
+    var rows = [["كشف عهدة " + monthName(S.month)], ["الموظف", S.settings.employee || ""], [],
+      ["رصيد أول المدة", moneyPlain(M.opening)], ["العهدة المستلمة", moneyPlain(M.received)], ["المدفوع من العهدة", moneyPlain(M.paid)],
+      ["الرصيد المفترض", moneyPlain(M.expected)], ["المبلغ الفعلي", M.counted != null ? moneyPlain(M.counted) : ""], ["الفرق", M.counted != null ? moneyPlain(M.counted - M.expected) : ""],
+      ["مصروفات الشهر", moneyPlain(M.purchases)], ["فواتير غير مدفوعة", moneyPlain(M.unpaidTotal)], [],
+      ["العهدة المستلمة"], ["التاريخ", "المبلغ", "ملاحظة"]];
+    M.receipts.slice().sort(function (a, b) { return a.date < b.date ? -1 : 1; }).forEach(function (r) { rows.push([r.date, moneyPlain(toU(r.amount)), r.note || ""]); });
+    rows.push([], ["الفواتير"], ["التاريخ", "المورد", "المبلغ", "الحالة", "تاريخ السداد"]);
+    monthInvoices(M).slice().reverse().forEach(function (i) {
+      rows.push([i.date, i.party, moneyPlain(toU(i.amount)), paidBy(i, end) ? "مدفوعة" : "غير مدفوعة", i.paidDate || ""]);
+    });
+    var csv = "﻿" + rows.map(function (r) { return r.map(c).join(","); }).join("\r\n");
+    S.downloads.save({ filename: "custody-" + S.month + ".csv", data: csv }).catch(function () {});
+  });
+
+  // ---------- boot ----------
+  try { var t = localStorage.getItem("custody.tab"); if (t && $("tab-" + t)) $("tab-" + t).click(); } catch (e) {}
+  render();
+
+  function snapList(col, key, assign) {
+    var timer = setTimeout(function () { S.stale = true; render(); }, 10000);
+    return S.db.collection(col).onSnapshot(function (snap) {
+      assign(snap.docs.map(function (d) { var x = Object.assign({}, d.data()); x.id = d.id; return x; }));
+      S.loaded[key] = true;
+      if (!snap.metadata.fromCache) { clearTimeout(timer); S.stale = false; }
+      render();
+    }, function () { clearTimeout(timer); S.loaded[key] = true; S.stale = true; render(); });
+  }
+
+  // The sign-in script below hands over the store and who is signed in, once their role is known.
+  window.startCustody = function (backend) {
+    S.db = backend.db; S.user = backend.user; S.downloads = backend.downloads;
+    if (!S.db) { S.dbMissing = true; render(); return; }
+    var u = S.user;
+    return Promise.all([u ? u.id() : null, u ? u.canEdit() : false, u ? u.can("data.write") : null]).then(function (v) {
+      S.uid = v[0]; S.canEdit = !!v[1]; S.canWrite = v[2] !== false; S.readOnly = !S.canWrite;
+      snapList("invoices", "inv", function (a) {
+        S.invoices = a.filter(function (i) { return validDate(i.date) && i.party; }).map(function (i) { i.month = i.date.slice(0, 7); if (i.paid && validDate(i.paidDate)) i.paidMonth = i.paidDate.slice(0, 7); else { i.paid = false; i.paidMonth = null; } return i; });
+      });
+      snapList("receipts", "rec", function (a) { S.receipts = a.filter(function (r) { return validDate(r.date); }).map(function (r) { r.month = r.date.slice(0, 7); return r; }); });
+      snapList("months", "mon", function (a) { var m = {}; a.forEach(function (d) { m[d.id] = d; }); S.months = m; });
+      S.db.doc("settings/main").onSnapshot(function (d) {
+        var x = d.exists ? d.data() : {};
+        S.settings = { employee: x.employee || "", currency: x.currency || "د.ك", decimals: [0, 2, 3].indexOf(x.decimals) >= 0 ? x.decimals : 3 };
+        S.loaded.set = true; lastFormMonth = null; render();
+      }, function () {});
+      render();
+    }).catch(function () { S.dbMissing = true; render(); });
+  };
+})();
+</script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="config.js"></script>
+<script>
+// Sign-in and accounts, the same way as the delivery site: everyone registers as
+// "pending", a manager approves them as manager or viewer.
+(function () {
+  "use strict";
+  var $ = function (id) { return document.getElementById(id); };
+  function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
+  function gate(which) {
+    $("gate").hidden = which === "app"; $("app").hidden = which !== "app";
+    $("gateLoading").hidden = which !== "loading";
+    $("loginForm").hidden = which !== "login"; $("regForm").hidden = true;
+    $("pendingBox").hidden = which !== "pending"; $("gateOut").hidden = which !== "pending";
+  }
+  var cfg = window.FIREBASE_CONFIG || {};
+  if (!window.firebase || !cfg.apiKey || cfg.apiKey === "PASTE_HERE") { $("gateLoading").hidden = true; $("cfgMissing").hidden = false; return; }
+  firebase.initializeApp(cfg);
+  var auth = firebase.auth(), fs = firebase.firestore();
+  var started = false, role = null, uid = null, usersUnsub = null;
+
+  var authMsg = function (e) {
+    return ({ "auth/invalid-credential": "الإيميل أو كلمة السر غلط", "auth/wrong-password": "كلمة السر غلط", "auth/user-not-found": "ما في حساب بهذا الإيميل", "auth/email-already-in-use": "هذا الإيميل مسجّل، ادخل بدل التسجيل", "auth/weak-password": "كلمة السر قصيرة", "auth/invalid-email": "الإيميل غير صحيح", "auth/network-request-failed": "تأكد من الإنترنت", "auth/too-many-requests": "محاولات كثيرة، انتظر قليلاً" })[e && e.code] || "صار خطأ، حاول مرة ثانية";
+  };
+  $("toReg").onclick = function () { $("loginForm").hidden = true; $("regForm").hidden = false; };
+  $("toLogin").onclick = function () { $("regForm").hidden = true; $("loginForm").hidden = false; };
+  $("loginForm").addEventListener("submit", function (e) {
+    e.preventDefault(); $("lErr").textContent = "";
+    auth.signInWithEmailAndPassword($("lEmail").value.trim(), $("lPass").value).catch(function (err) { $("lErr").textContent = authMsg(err); });
+  });
+  $("forgot").onclick = function () {
+    var email = $("lEmail").value.trim();
+    if (!email) { $("lErr").textContent = "اكتب إيميلك أولاً ثم اضغط نسيت كلمة السر"; return; }
+    auth.sendPasswordResetEmail(email).then(function () { $("lErr").textContent = "أرسلنا رابط تغيير كلمة السر إلى إيميلك"; }).catch(function (err) { $("lErr").textContent = authMsg(err); });
+  };
+  $("regForm").addEventListener("submit", function (e) {
+    e.preventDefault(); $("rErr").textContent = "";
+    var name = $("rName").value.trim(); if (!name) return;
+    auth.createUserWithEmailAndPassword($("rEmail").value.trim(), $("rPass").value).then(function (cred) {
+      return fs.doc("users/" + cred.user.uid).set({ name: name, email: cred.user.email, role: "pending", createdAt: Date.now() });
+    }).catch(function (err) { $("rErr").textContent = authMsg(err); });
+  });
+  function logout() { auth.signOut().then(function () { location.reload(); }); }
+  $("logoutBtn").onclick = logout; $("gateLogout").onclick = logout;
+
+  auth.onAuthStateChanged(function (u) {
+    if (!u) { if (started) { location.reload(); return; } gate("login"); return; }
+    uid = u.uid; gate("loading");
+    fs.doc("users/" + uid).onSnapshot(function (snap) {
+      var me = snap.exists ? snap.data() : null, next = me ? me.role : null;
+      $("gateWho").textContent = (me && me.name) || u.email; $("meName").textContent = (me && me.name) || u.email;
+      if (started) { if (next !== role) location.reload(); return; }
+      role = next;
+      if (role === "manager" || role === "viewer") { started = true; gate("app"); begin(role, me); }
+      else gate("pending");
+    }, function () { gate("pending"); });
+  });
+
+  function begin(role, me) {
+    var isManager = role === "manager";
+    window.startCustody({
+      db: fs,
+      user: {
+        id: function () { return Promise.resolve(uid); },
+        canEdit: function () { return Promise.resolve(isManager); },
+        can: function () { return Promise.resolve(isManager); },
+        profiles: function (ids) {
+          return Promise.all(ids.map(function (id) {
+            return fs.doc("users/" + id).get().then(function (s) { return [id, { name: s.exists ? (s.data().name || "") : "" }]; }).catch(function () { return [id, { name: "" }]; });
+          })).then(function (pairs) { var o = {}; pairs.forEach(function (p) { o[p[0]] = p[1]; }); return o; });
+        }
+      },
+      downloads: {
+        save: function (req) {
+          var blob = new Blob([req.data], { type: "text/csv;charset=utf-8" });
+          var a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = req.filename;
+          document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+          return Promise.resolve({ status: "saved" });
+        }
+      }
+    });
+    $("usersBtn").hidden = !isManager;
+    if (isManager) setupUsers();
+  }
+
+  // Account approvals, for managers only.
+  function setupUsers() {
+    var LABEL = { pending: "بانتظار الموافقة", manager: "مدير", viewer: "مشاهد", disabled: "موقوف" };
+    var ORDER = { pending: 0, manager: 1, viewer: 2, disabled: 3 };
+    var users = [];
+    $("usersBtn").onclick = function () {
+      $("usersCard").hidden = false;
+      if (!usersUnsub) usersUnsub = fs.collection("users").onSnapshot(function (s) { users = s.docs.map(function (d) { var x = d.data(); x.id = d.id; return x; }); draw(); }, function () { $("usersList").innerHTML = '<p class="err">تعذّر تحميل الحسابات.</p>'; });
+    };
+    $("closeUsers").onclick = function () { $("usersCard").hidden = true; };
+    function draw() {
+      var pend = users.filter(function (u) { return u.role === "pending"; }).length;
+      $("usersBtn").textContent = pend ? "الحسابات (" + pend + " جديد)" : "الحسابات";
+      var list = users.slice().sort(function (a, b) { return (ORDER[a.role] == null ? 9 : ORDER[a.role]) - (ORDER[b.role] == null ? 9 : ORDER[b.role]); });
+      if (!list.length) { $("usersList").innerHTML = '<p class="empty">لا توجد حسابات.</p>'; return; }
+      $("usersList").innerHTML = list.map(function (u) {
+        var acts = "";
+        if (u.id === uid) acts = '<span class="hint">هذا حسابك</span>';
+        else if (u.role === "pending") acts = '<button class="btn sm primary" data-role="viewer" type="button">موافقة كمشاهد</button><button class="btn sm" data-role="manager" type="button">موافقة كمدير</button><button class="btn sm danger" data-role="disabled" type="button">رفض</button>';
+        else if (u.role === "viewer") acts = '<button class="btn sm" data-role="manager" type="button">ترقية لمدير</button><button class="btn sm danger" data-role="disabled" type="button">إيقاف</button>';
+        else if (u.role === "manager") acts = '<button class="btn sm" data-role="viewer" type="button">إرجاع لمشاهد</button><button class="btn sm danger" data-role="disabled" type="button">إيقاف</button>';
+        else if (u.role === "disabled") acts = '<button class="btn sm" data-role="viewer" type="button">إعادة تفعيل كمشاهد</button>';
+        return '<div class="entry" data-uid="' + esc(u.id) + '"><div><div class="who">' + esc(u.name || "") + ' <span class="tag">' + esc(LABEL[u.role] || u.role || "") + '</span></div><div class="meta" dir="ltr" style="justify-content:flex-end">' + esc(u.email || "") + '</div></div><div class="acts">' + acts + "</div></div>";
+      }).join("");
+    }
+    // Two taps to change a role, so a stray tap never promotes or stops anyone.
+    $("usersList").addEventListener("click", function (e) {
+      var b = e.target.closest("[data-role]"); if (!b) return;
+      var id = b.closest("[data-uid]").dataset.uid;
+      if (!b.dataset.armed) { b.dataset.armed = "1"; b.dataset.old = b.textContent; b.textContent = "تأكيد"; setTimeout(function () { if (b.dataset.armed) { delete b.dataset.armed; b.textContent = b.dataset.old; } }, 3000); return; }
+      delete b.dataset.armed; b.disabled = true;
+      fs.doc("users/" + id).update({ role: b.dataset.role }).catch(function () { b.disabled = false; b.textContent = "تعذّر الحفظ"; });
+    });
+  }
+})();
+</script>
+</body>
+</html>
