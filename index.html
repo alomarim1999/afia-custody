@@ -47,6 +47,7 @@ html, body { margin: 0; }
 .gate { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding-block: 24px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
 .gatecard { width: 100%; max-width: 380px; }
 .gatecard form { display: flex; flex-direction: column; gap: 12px; }
+.perms { grid-column: 1 / -1; background: var(--sunk); border-radius: 8px; padding: 8px 10px; flex-direction: column; align-items: flex-start; }
 .linkbtn { border: 0; background: none; color: var(--accent); padding: 0; font-size: .85rem; text-decoration: underline; }
 body { background: var(--paper); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.6; }
 .app { max-width: 1100px; margin: 0 auto; padding-block: 20px 48px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 18px; }
@@ -340,6 +341,7 @@ input:disabled, select:disabled, button:disabled { opacity: .55; cursor: not-all
   var S = {
     db: null, user: null, downloads: null, uid: null,
     canEdit: false, canWrite: false, readOnly: true,
+    perm: { addInvoice: false, payInvoice: false, addReceipt: false, deleteOwn: false },
     invoices: [], receipts: [], months: {},
     settings: { employee: "", currency: "د.ك", decimals: 3 },
     loaded: { inv: false, rec: false, mon: false, set: false },
@@ -475,9 +477,12 @@ input:disabled, select:disabled, button:disabled { opacity: .55; cursor: not-all
 
   var lastFormMonth = null;
   function renderForms(M) {
-    var locked = M.closed || S.readOnly;
-    ["invDate", "invAmount", "invParty", "invPaid", "invSubmit"].forEach(function (id) { $(id).disabled = locked; });
-    var recLocked = M.closed || !S.canEdit;
+    var locked = M.closed || !S.perm.addInvoice;
+    ["invDate", "invAmount", "invParty", "invSubmit"].forEach(function (id) { $(id).disabled = locked; });
+    // Without the right to pay, an invoice can only be recorded as still owed.
+    $("invPaid").disabled = locked || !S.perm.payInvoice;
+    if (!S.perm.payInvoice) $("invPaid").checked = false;
+    var recLocked = M.closed || !S.perm.addReceipt;
     ["recDate", "recAmount", "recNote", "recSubmit"].forEach(function (id) { $(id).disabled = recLocked; });
     if (lastFormMonth !== S.month) {
       lastFormMonth = S.month;
@@ -486,8 +491,8 @@ input:disabled, select:disabled, button:disabled { opacity: .55; cursor: not-all
       $("invDate").min = $("recDate").min = S.month + "-01";
       $("invDate").max = $("recDate").max = monthEnd(S.month);
     }
-    $("invErr").textContent = M.closed ? "هذا الشهر مُقفل. انتقل إلى شهر مفتوح للتسجيل." : (S.readOnly && allLoaded() ? "لا تملك صلاحية التسجيل." : ($("invErr").dataset.msg || ""));
-    $("recErr").textContent = M.closed ? "هذا الشهر مُقفل." : (!S.canEdit && allLoaded() ? "تسليم العهدة يسجّله المدير فقط." : ($("recErr").dataset.msg || ""));
+    $("invErr").textContent = M.closed ? "هذا الشهر مُقفل. انتقل إلى شهر مفتوح للتسجيل." : (!S.perm.addInvoice && allLoaded() ? "لا تملك صلاحية تسجيل الفواتير." : ($("invErr").dataset.msg || ""));
+    $("recErr").textContent = M.closed ? "هذا الشهر مُقفل." : (!S.perm.addReceipt && allLoaded() ? "لا تملك صلاحية تسجيل العهدة." : ($("recErr").dataset.msg || ""));
     var parties = {};
     S.invoices.forEach(function (i) { if (i.party) parties[i.party] = 1; });
     $("parties").innerHTML = Object.keys(parties).sort().map(function (p) { return '<option value="' + esc(p) + '">'; }).join("");
@@ -547,11 +552,13 @@ input:disabled, select:disabled, button:disabled { opacity: .55; cursor: not-all
     }
     var a = [];
     var editableHere = !isClosed(i.month) && !(i.paid && isClosed(i.paidMonth));
-    if (!i.paid && !M.closed) a.push('<button class="btn sm primary" data-act="pay" type="button">سداد من العهدة</button>');
-    if (i.paid && !isClosed(i.paidMonth) && (i.paidMonth === M.ym || i.month === M.ym)) a.push('<button class="btn sm" data-act="unpay" type="button">إلغاء السداد</button>');
-    if (editableHere && i.month === M.ym) a.push('<button class="btn sm danger" data-act="del" type="button">حذف</button>');
+    if (S.perm.payInvoice && !i.paid && !M.closed) a.push('<button class="btn sm primary" data-act="pay" type="button">سداد من العهدة</button>');
+    if (S.perm.payInvoice && i.paid && !isClosed(i.paidMonth) && (i.paidMonth === M.ym || i.month === M.ym)) a.push('<button class="btn sm" data-act="unpay" type="button">إلغاء السداد</button>');
+    if (canDelete(i) && editableHere && i.month === M.ym) a.push('<button class="btn sm danger" data-act="del" type="button">حذف</button>');
     return a.join("");
   }
+  // A manager deletes anything; a purchasing employee only their own, and only when allowed.
+  function canDelete(row) { return S.canEdit || (S.perm.deleteOwn && !!row.by && row.by === S.uid); }
 
   function renderReceipts(M) {
     var list = M.receipts.slice().sort(function (a, b) { return a.date < b.date ? 1 : a.date > b.date ? -1 : 0; });
@@ -560,7 +567,7 @@ input:disabled, select:disabled, button:disabled { opacity: .55; cursor: not-all
     if (!list.length) { $("recList").innerHTML = '<p class="empty">لم تُسجَّل أي عهدة مستلمة لهذا الشهر. كل مبلغ يُسلَّم للموظف يُسجَّل هنا بتاريخه.</p>'; return; }
     var h = list.map(function (r) {
       var acts = "";
-      if (S.canEdit && !M.closed) {
+      if (canDelete(r) && !M.closed) {
         acts = S.confirmDel === r.id
           ? '<div class="inline"><span>حذف هذا الاستلام؟</span><button class="btn sm danger" data-act="delRecYes" type="button">حذف</button><button class="btn sm" data-act="delNo" type="button">تراجع</button></div>'
           : '<button class="btn sm danger" data-act="delRec" type="button">حذف</button>';
@@ -693,7 +700,7 @@ input:disabled, select:disabled, button:disabled { opacity: .55; cursor: not-all
     if (isClosed(date.slice(0, 7))) return say(err, monthName(date.slice(0, 7)) + " مُقفل. لا يمكن إضافة فاتورة بتاريخه.");
     if (!party) return say(err, "اكتب اسم المورد أو الجهة.");
     if (amount <= 0) return say(err, "أدخل مبلغاً أكبر من صفر.");
-    var paid = $("invPaid").checked;
+    var paid = $("invPaid").checked && S.perm.payInvoice;
     var doc = {
       date: date, month: date.slice(0, 7), party: party, amount: fromU(amount), paid: paid, paidDate: paid ? date : null, paidMonth: paid ? date.slice(0, 7) : null, by: S.uid, at: new Date().toISOString()
     };
@@ -853,7 +860,14 @@ input:disabled, select:disabled, button:disabled { opacity: .55; cursor: not-all
     if (!S.db) { S.dbMissing = true; render(); return; }
     var u = S.user;
     return Promise.all([u ? u.id() : null, u ? u.canEdit() : false, u ? u.can("data.write") : null]).then(function (v) {
-      S.uid = v[0]; S.canEdit = !!v[1]; S.canWrite = v[2] !== false; S.readOnly = !S.canWrite;
+      S.uid = v[0]; S.canEdit = !!v[1]; S.canWrite = v[2] !== false;
+      var all = S.canEdit && S.canWrite;
+      var p = backend.perms || {};
+      S.perm = {
+        addInvoice: all || p.addInvoice === true, payInvoice: all || p.payInvoice === true,
+        addReceipt: all || p.addReceipt === true, deleteOwn: all || p.deleteOwn === true
+      };
+      S.readOnly = !(S.perm.addInvoice || S.perm.payInvoice || S.perm.addReceipt);
       snapList("invoices", "inv", function (a) {
         S.invoices = a.filter(function (i) { return validDate(i.date) && i.party; }).map(function (i) { i.month = i.date.slice(0, 7); if (i.paid && validDate(i.paidDate)) i.paidMonth = i.paidDate.slice(0, 7); else { i.paid = false; i.paidMonth = null; } return i; });
       });
@@ -875,7 +889,7 @@ input:disabled, select:disabled, button:disabled { opacity: .55; cursor: not-all
 <script src="config.js"></script>
 <script>
 // Sign-in and accounts, the same way as the delivery site: everyone registers as
-// "pending", a manager approves them as manager or viewer.
+// "pending", a manager approves them as manager, purchasing employee or viewer.
 (function () {
   "use strict";
   var $ = function (id) { return document.getElementById(id); };
@@ -890,7 +904,22 @@ input:disabled, select:disabled, button:disabled { opacity: .55; cursor: not-all
   if (!window.firebase || !cfg.apiKey || cfg.apiKey === "PASTE_HERE") { $("gateLoading").hidden = true; $("cfgMissing").hidden = false; return; }
   firebase.initializeApp(cfg);
   var auth = firebase.auth(), fs = firebase.firestore();
-  var started = false, role = null, uid = null, usersUnsub = null;
+  var started = false, access = null, uid = null, usersUnsub = null;
+  var ROLES = ["manager", "purchaser", "viewer"];
+  // What a purchasing employee may do; the manager switches each one on or off.
+  var PERMS = [
+    ["addInvoice", "تسجيل الفواتير والمصاريف"],
+    ["payInvoice", "سداد الفواتير من العهدة"],
+    ["addReceipt", "تسجيل العهدة المستلمة"],
+    ["deleteOwn", "حذف ما سجّله بنفسه"]
+  ];
+  var DEFAULT_PERMS = { addInvoice: true, payInvoice: true, addReceipt: true, deleteOwn: false };
+  function accessKey(me) {
+    if (!me) return "none";
+    if (me.role !== "purchaser") return me.role;
+    var p = me.perms || {};
+    return "purchaser:" + PERMS.map(function (x) { return p[x[0]] === true ? 1 : 0; }).join("");
+  }
 
   var authMsg = function (e) {
     return ({ "auth/invalid-credential": "الإيميل أو كلمة السر غلط", "auth/wrong-password": "كلمة السر غلط", "auth/user-not-found": "ما في حساب بهذا الإيميل", "auth/email-already-in-use": "هذا الإيميل مسجّل، ادخل بدل التسجيل", "auth/weak-password": "كلمة السر قصيرة", "auth/invalid-email": "الإيميل غير صحيح", "auth/network-request-failed": "تأكد من الإنترنت", "auth/too-many-requests": "محاولات كثيرة، انتظر قليلاً" })[e && e.code] || "صار خطأ، حاول مرة ثانية";
@@ -920,11 +949,12 @@ input:disabled, select:disabled, button:disabled { opacity: .55; cursor: not-all
     if (!u) { if (started) { location.reload(); return; } gate("login"); return; }
     uid = u.uid; gate("loading");
     fs.doc("users/" + uid).onSnapshot(function (snap) {
-      var me = snap.exists ? snap.data() : null, next = me ? me.role : null;
+      var me = snap.exists ? snap.data() : null, next = accessKey(me);
       $("gateWho").textContent = (me && me.name) || u.email; $("meName").textContent = (me && me.name) || u.email;
-      if (started) { if (next !== role) location.reload(); return; }
-      role = next;
-      if (role === "manager" || role === "viewer") { started = true; gate("app"); begin(role, me); }
+      // A changed role or permission takes effect at once: the page starts again with it.
+      if (started) { if (next !== access) location.reload(); return; }
+      access = next;
+      if (me && ROLES.indexOf(me.role) >= 0) { started = true; gate("app"); begin(me.role, me); }
       else gate("pending");
     }, function () { gate("pending"); });
   });
@@ -933,10 +963,11 @@ input:disabled, select:disabled, button:disabled { opacity: .55; cursor: not-all
     var isManager = role === "manager";
     window.startCustody({
       db: fs,
+      perms: role === "purchaser" ? (me.perms || {}) : null,
       user: {
         id: function () { return Promise.resolve(uid); },
         canEdit: function () { return Promise.resolve(isManager); },
-        can: function () { return Promise.resolve(isManager); },
+        can: function () { return Promise.resolve(role !== "viewer"); },
         profiles: function (ids) {
           return Promise.all(ids.map(function (id) {
             return fs.doc("users/" + id).get().then(function (s) { return [id, { name: s.exists ? (s.data().name || "") : "" }]; }).catch(function () { return [id, { name: "" }]; });
@@ -958,8 +989,9 @@ input:disabled, select:disabled, button:disabled { opacity: .55; cursor: not-all
 
   // Account approvals, for managers only.
   function setupUsers() {
-    var LABEL = { pending: "بانتظار الموافقة", manager: "مدير", viewer: "مشاهد", disabled: "موقوف" };
-    var ORDER = { pending: 0, manager: 1, viewer: 2, disabled: 3 };
+    var LABEL = { pending: "بانتظار الموافقة", manager: "مدير", purchaser: "موظف مشتريات", viewer: "مشاهد", disabled: "موقوف" };
+    var ORDER = { pending: 0, manager: 1, purchaser: 2, viewer: 3, disabled: 4 };
+    function btn(role, text, cls) { return '<button class="btn sm ' + (cls || "") + '" data-role="' + role + '" type="button">' + text + "</button>"; }
     var users = [];
     $("usersBtn").onclick = function () {
       $("usersCard").hidden = false;
@@ -974,11 +1006,19 @@ input:disabled, select:disabled, button:disabled { opacity: .55; cursor: not-all
       $("usersList").innerHTML = list.map(function (u) {
         var acts = "";
         if (u.id === uid) acts = '<span class="hint">هذا حسابك</span>';
-        else if (u.role === "pending") acts = '<button class="btn sm primary" data-role="viewer" type="button">موافقة كمشاهد</button><button class="btn sm" data-role="manager" type="button">موافقة كمدير</button><button class="btn sm danger" data-role="disabled" type="button">رفض</button>';
-        else if (u.role === "viewer") acts = '<button class="btn sm" data-role="manager" type="button">ترقية لمدير</button><button class="btn sm danger" data-role="disabled" type="button">إيقاف</button>';
-        else if (u.role === "manager") acts = '<button class="btn sm" data-role="viewer" type="button">إرجاع لمشاهد</button><button class="btn sm danger" data-role="disabled" type="button">إيقاف</button>';
-        else if (u.role === "disabled") acts = '<button class="btn sm" data-role="viewer" type="button">إعادة تفعيل كمشاهد</button>';
-        return '<div class="entry" data-uid="' + esc(u.id) + '"><div><div class="who">' + esc(u.name || "") + ' <span class="tag">' + esc(LABEL[u.role] || u.role || "") + '</span></div><div class="meta" dir="ltr" style="justify-content:flex-end">' + esc(u.email || "") + '</div></div><div class="acts">' + acts + "</div></div>";
+        else if (u.role === "pending") acts = btn("purchaser", "موافقة كموظف مشتريات", "primary") + btn("viewer", "موافقة كمشاهد") + btn("manager", "موافقة كمدير") + btn("disabled", "رفض", "danger");
+        else if (u.role === "purchaser") acts = btn("viewer", "تحويل لمشاهد") + btn("manager", "ترقية لمدير") + btn("disabled", "إيقاف", "danger");
+        else if (u.role === "viewer") acts = btn("purchaser", "تحويل لموظف مشتريات") + btn("manager", "ترقية لمدير") + btn("disabled", "إيقاف", "danger");
+        else if (u.role === "manager") acts = btn("viewer", "إرجاع لمشاهد") + btn("disabled", "إيقاف", "danger");
+        else if (u.role === "disabled") acts = btn("viewer", "إعادة تفعيل كمشاهد");
+        var perms = "";
+        if (u.role === "purchaser" && u.id !== uid) {
+          var p = u.perms || {};
+          perms = '<div class="acts perms">' + PERMS.map(function (x) {
+            return '<label class="check"><input type="checkbox" data-perm="' + x[0] + '"' + (p[x[0]] === true ? " checked" : "") + ">" + x[1] + "</label>";
+          }).join("") + '<span class="hint">لا يستطيع إقفال الشهر، ولا تعديل رصيد أول المدة أو الإعدادات، ولا الموافقة على الحسابات.</span></div>';
+        }
+        return '<div class="entry" data-uid="' + esc(u.id) + '"><div><div class="who">' + esc(u.name || "") + ' <span class="tag">' + esc(LABEL[u.role] || u.role || "") + '</span></div><div class="meta" dir="ltr" style="justify-content:flex-end">' + esc(u.email || "") + '</div></div><div class="acts">' + acts + "</div>" + perms + "</div>";
       }).join("");
     }
     // Two taps to change a role, so a stray tap never promotes or stops anyone.
@@ -987,7 +1027,18 @@ input:disabled, select:disabled, button:disabled { opacity: .55; cursor: not-all
       var id = b.closest("[data-uid]").dataset.uid;
       if (!b.dataset.armed) { b.dataset.armed = "1"; b.dataset.old = b.textContent; b.textContent = "تأكيد"; setTimeout(function () { if (b.dataset.armed) { delete b.dataset.armed; b.textContent = b.dataset.old; } }, 3000); return; }
       delete b.dataset.armed; b.disabled = true;
-      fs.doc("users/" + id).update({ role: b.dataset.role }).catch(function () { b.disabled = false; b.textContent = "تعذّر الحفظ"; });
+      var patch = { role: b.dataset.role };
+      var cur = users.filter(function (x) { return x.id === id; })[0];
+      if (b.dataset.role === "purchaser" && !(cur && cur.perms)) patch.perms = DEFAULT_PERMS;
+      fs.doc("users/" + id).update(patch).catch(function () { b.disabled = false; b.textContent = "تعذّر الحفظ"; });
+    });
+    // Each permission saves the moment its box is ticked or cleared.
+    $("usersList").addEventListener("change", function (e) {
+      var c = e.target.closest("[data-perm]"); if (!c) return;
+      var id = c.closest("[data-uid]").dataset.uid, patch = {};
+      patch["perms." + c.dataset.perm] = c.checked;
+      c.disabled = true;
+      fs.doc("users/" + id).update(patch).then(function () { c.disabled = false; }).catch(function () { c.disabled = false; c.checked = !c.checked; });
     });
   }
 })();

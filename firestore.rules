@@ -6,7 +6,14 @@ service cloud.firestore {
     function profile() { return get(/databases/$(database)/documents/users/$(request.auth.uid)).data; }
     function hasProfile() { return signedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid)); }
     function isManager() { return hasProfile() && profile().role == 'manager'; }
-    function canRead() { return hasProfile() && profile().role in ['manager', 'viewer']; }
+    function canRead() { return hasProfile() && profile().role in ['manager', 'viewer', 'purchaser']; }
+
+    // موظف المشتريات: كل صلاحية يفعّلها المدير له من شاشة الحسابات
+    function perm(p) {
+      return hasProfile() && profile().role == 'purchaser'
+        && profile().get('perms', {}).get(p, false) == true;
+    }
+    function mine(data) { return data.get('by', '') == request.auth.uid; }
 
     // الشهر المقفل لا يقبل أي إضافة أو تعديل بتاريخه
     function monthOpen(m) {
@@ -22,20 +29,22 @@ service cloud.firestore {
       allow update, delete: if isManager();
     }
 
-    // الفواتير: المدير يسجّل ويسدّد، والمشاهد يقرأ فقط
+    // الفواتير: المدير يسجّل ويسدّد، وموظف المشتريات حسب صلاحياته، والمشاهد يقرأ فقط
     match /invoices/{id} {
       allow read: if canRead();
-      allow create: if isManager()
+      allow create: if (isManager() || (perm('addInvoice') && mine(request.resource.data)))
                     && monthOpen(request.resource.data.month)
-                    && (request.resource.data.paid != true || monthOpen(request.resource.data.paidMonth));
-      // التعديل الوحيد هو السداد أو إلغاؤه: التاريخ والمورد والمبلغ لا يتغيّرون
-      allow update: if isManager()
+                    && (request.resource.data.paid != true
+                        || ((isManager() || perm('payInvoice')) && monthOpen(request.resource.data.paidMonth)));
+      // التعديل الوحيد هو السداد أو إلغاؤه: التاريخ والمورد والمبلغ والمسجِّل لا يتغيّرون
+      allow update: if (isManager() || perm('payInvoice'))
                     && request.resource.data.date == resource.data.date
                     && request.resource.data.party == resource.data.party
                     && request.resource.data.amount == resource.data.amount
+                    && request.resource.data.get('by', '') == resource.data.get('by', '')
                     && (resource.data.paid != true || monthOpen(resource.data.paidMonth))
                     && (request.resource.data.paid != true || monthOpen(request.resource.data.paidMonth));
-      allow delete: if isManager()
+      allow delete: if (isManager() || (perm('deleteOwn') && mine(resource.data)))
                     && monthOpen(resource.data.month)
                     && (resource.data.paid != true || monthOpen(resource.data.paidMonth));
     }
@@ -43,8 +52,10 @@ service cloud.firestore {
     // العهدة المستلمة
     match /receipts/{id} {
       allow read: if canRead();
-      allow create: if isManager() && monthOpen(request.resource.data.month);
-      allow delete: if isManager() && monthOpen(resource.data.month);
+      allow create: if (isManager() || (perm('addReceipt') && mine(request.resource.data)))
+                    && monthOpen(request.resource.data.month);
+      allow delete: if (isManager() || (perm('deleteOwn') && mine(resource.data)))
+                    && monthOpen(resource.data.month);
     }
 
     // الأشهر (رصيد أول المدة والإقفال) والإعدادات
