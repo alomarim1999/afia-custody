@@ -15,10 +15,11 @@ service cloud.firestore {
     }
     function mine(data) { return data.get('by', '') == request.auth.uid; }
 
-    // الشهر المقفل لا يقبل أي إضافة أو تعديل بتاريخه
+    // الشهر المقفل لا يقبل أي إضافة أو تعديل بتاريخه.
+    // شهر فيه رصيد أول المدة فقط ليس له حالة بعد، فهو مفتوح.
     function monthOpen(m) {
       return !exists(/databases/$(database)/documents/months/$(m))
-        || get(/databases/$(database)/documents/months/$(m)).data.status != 'closed';
+        || get(/databases/$(database)/documents/months/$(m)).data.get('status', 'open') != 'closed';
     }
 
     // الحسابات: كل شخص يسجّل نفسه "بانتظار الموافقة"، والمدير فقط يغيّر الصلاحيات
